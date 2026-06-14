@@ -83,7 +83,14 @@ function App() {
     );
 
     const json = await res.json();
-    setSsbData(json?.dimension?.Landbakgrunn?.category?.label);
+
+    const labels = json?.dimension?.Landbakgrunn?.category?.label;
+
+    const filtered = Object.fromEntries(
+      Object.entries(labels).slice(0, -5)
+    );
+
+    setSsbData(filtered);
   };
 
   const fetchPopulationData = async (landbakgrunn) => {
@@ -92,6 +99,7 @@ function App() {
     const ssbIds = kartpopData.map((item) => item.ssbid).join(",");
 
     try {
+      // console.log(`https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`)
       const res = await fetch(
         `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`
       );
@@ -136,7 +144,7 @@ function App() {
       <div className="control-panel">
         {/* Header */}
         <div className="control-header">
-          Population Explorer
+          Etnisiter i Norge
         </div>
 
         {/* Select */}
@@ -157,8 +165,10 @@ function App() {
             }}
             className={`control-select ${loading ? "disabled" : ""}`}
           >
-            <option value="">Choose an option</option>
-            {Object.entries(ssbData).map(([key, label]) => (
+            <option value="">Velg et land</option>
+            {Object.entries(ssbData)
+              .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "no", { sensitivity: "base" }))
+              .map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
@@ -167,16 +177,16 @@ function App() {
         )}
 
         {/* Info */}
-        <div className="info-text">
+        {/* <div className="info-text">
           <div><b>Key:</b> {selectedKey || "—"}</div>
           <div><b>Value:</b> {selectedLabel || "—"}</div>
-        </div>
+        </div> */}
 
         {/* Loading */}
         {loading && (
           <div className="loading-box">
             <span className="spinner" />
-            Loading population…
+            Laster populasjon...
           </div>
         )}
       </div>
