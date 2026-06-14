@@ -131,34 +131,11 @@ function App() {
   }, [drawMap]);
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100%",
-        position: "relative",
-      }}
-    >
+    <div className="app-container">
       {/* Control Panel */}
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 12,
-          zIndex: 1000,
-          width: 260,
-          background: "rgba(255,255,255,0.95)",
-          backdropFilter: "blur(8px)",
-          borderRadius: 12,
-          padding: 12,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
+      <div className="control-panel">
         {/* Header */}
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>
+        <div className="control-header">
           Population Explorer
         </div>
 
@@ -178,15 +155,7 @@ function App() {
                 setLoading(false);
               });
             }}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              outline: "none",
-              fontSize: 14,
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.6 : 1,
-            }}
+            className={`control-select ${loading ? "disabled" : ""}`}
           >
             <option value="">Choose an option</option>
             {Object.entries(ssbData).map(([key, label]) => (
@@ -198,25 +167,14 @@ function App() {
         )}
 
         {/* Info */}
-        <div style={{ fontSize: 13, color: "#444" }}>
+        <div className="info-text">
           <div><b>Key:</b> {selectedKey || "—"}</div>
           <div><b>Value:</b> {selectedLabel || "—"}</div>
         </div>
 
-        {/* Loading State (embedded in panel) */}
+        {/* Loading */}
         {loading && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 10px",
-              borderRadius: 8,
-              background: "#f5f7ff",
-              color: "#3b5bdb",
-              fontSize: 13,
-            }}
-          >
+          <div className="loading-box">
             <span className="spinner" />
             Loading population…
           </div>
@@ -224,7 +182,7 @@ function App() {
       </div>
 
       {/* Map */}
-      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+      <div ref={mapRef} className="map-container" />
     </div>
   );
 }
