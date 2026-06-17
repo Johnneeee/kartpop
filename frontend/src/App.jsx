@@ -134,9 +134,28 @@ function App() {
     setLoading(false);
   };
 
+  // useEffect(() => {
+  //   setLoading(true);
+  //   fetchKommuneData();
+  //   fetchSsbMetadata();
+  //   setLoading(false);
+  // }, []);
+
   useEffect(() => {
-    fetchKommuneData();
-    fetchSsbMetadata();
+    const loadData = async () => {
+      setLoading(true);
+
+      try {
+        await Promise.all([
+          fetchKommuneData(),
+          fetchSsbMetadata(),
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -208,7 +227,7 @@ function App() {
         {loading && (
           <div className="loading-box">
             <span className="spinner" />
-            Laster populasjon...
+            Laster inn data...
           </div>
         )}
       </div>
