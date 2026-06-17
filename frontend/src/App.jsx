@@ -89,8 +89,13 @@ function App() {
     const filtered = Object.fromEntries(
       Object.entries(labels).slice(0, -5)
     );
-
-    setSsbData(filtered);
+    // console.log(filtered)
+    // console.log({1010: "Norge",...filtered});
+    setSsbData({
+      1010: "Norge",
+      ...filtered,
+    });
+    // setSsbData(filtered);
   };
 
   const fetchPopulationData = async (landbakgrunn) => {
@@ -99,16 +104,33 @@ function App() {
     const ssbIds = kartpopData.map((item) => item.ssbid).join(",");
 
     try {
-      // console.log(`https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`)
-      const res = await fetch(
-        `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`
-      );
+      let result = [];
 
-      const data = await res.json();
-      setPopulation(data?.value ?? []);
+      if (landbakgrunn == 1010) { // in country is norway: do some calculations
+        const res = await fetch(
+          `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1,AndelBefolkning&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=999`
+        );
+        const data = await res.json();
+        const values = data.value;
+
+        for (let i = 0; i < values.length; i += 2) {
+          const num = values[i];
+          const frac = values[i + 1];
+          result.push(frac ? Math.trunc((num / frac * 100) - num) : null);
+        }
+      } else {
+        const response = await fetch(
+          `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`
+        );
+        const data = await response.json();
+        result = data?.value ?? [];
+      }
+
+      setPopulation(result);
     } catch (err) {
       console.error("Failed to fetch population data:", err);
     }
+
     setLoading(false);
   };
 
