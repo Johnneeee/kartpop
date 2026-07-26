@@ -7,8 +7,11 @@ import { API_URL } from "./api.js";
 function App() {
   const [kartpopData, setKartpopData] = useState([]);
   const [ssbData, setSsbData] = useState(null);
+  const [ssbDataAlder, setSsbDataAlder] = useState(null);
   const [selectedKey, setSelectedKey] = useState("");
+  const [selectedAlder, setSelectedAlder] = useState("");
   const [selectedLabel, setSelectedLabel] = useState("");
+  const [selectedLabelAlder, setSelectedLabelAlder] = useState("");
   const [population, setPopulation] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -89,13 +92,26 @@ function App() {
     const filtered = Object.fromEntries(
       Object.entries(labels).slice(0, -5)
     );
-    // console.log(filtered)
-    // console.log({1010: "Norge",...filtered});
     setSsbData({
       1010: "Norge",
       ...filtered,
     });
-    // setSsbData(filtered);
+  };
+
+  const fetchSsbMetadataAlder = async () => {
+    const res = await fetch(
+      "https://data.ssb.no/api/pxwebapi/v2/tables/07459/metadata?lang=no"
+    );
+
+    const json = await res.json();
+
+    const labels = json?.dimension?.Alder?.category?.label;
+
+    const filtered = Object.fromEntries(
+      Object.entries(labels).slice(0, -5)
+    );
+    console.log(filtered)
+    setSsbDataAlder(filtered);
   };
 
   const fetchPopulationData = async (landbakgrunn) => {
@@ -106,7 +122,7 @@ function App() {
     try {
       let result = [];
 
-      if (landbakgrunn == 1010) { // in country is norway: do some calculations
+      if (landbakgrunn == 1010) { // if country is norway: do some calculations
         const res = await fetch(
           `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1,AndelBefolkning&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=999`
         );
@@ -134,12 +150,27 @@ function App() {
     setLoading(false);
   };
 
-  // useEffect(() => {
-  //   setLoading(true);
-  //   fetchKommuneData();
-  //   fetchSsbMetadata();
-  //   setLoading(false);
-  // }, []);
+  const fetchPopulationDataAlder = async (alder) => {
+    if (!kartpopData.length) return;
+
+    const ssbIds = kartpopData.map((item) => item.ssbid).join(",");
+
+    try {
+      let result = [];
+      const response = await fetch(
+        `https://data.ssb.no/api/pxwebapi/v2/tables/07459/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Alder]=${alder}`
+      );
+      const data = await response.json();
+      result = data?.value ?? [];
+
+
+      setPopulation(result);
+    } catch (err) {
+      console.error("Failed to fetch population data:", err);
+    }
+
+    setLoading(false);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -149,6 +180,7 @@ function App() {
         await Promise.all([
           fetchKommuneData(),
           fetchSsbMetadata(),
+          fetchSsbMetadataAlder(),
         ]);
       } finally {
         setLoading(false);
@@ -185,7 +217,7 @@ function App() {
       <div className="control-panel">
         {/* Header */}
         <div className="control-header">
-          Etnisiter i Norge
+          Etnisiter i Norge (ssb tabell 09817)
         </div>
 
         {/* Select */}
@@ -216,14 +248,42 @@ function App() {
             ))}
           </select>
         )}
+        <div className="control-header">
+          Aldersgrupper i Norge (ssb tabell 07459)
+        </div>
+        {ssbDataAlder && (
+          <select
+            value={selectedAlder}
+            disabled={loading}
+            onChange={(e) => {
+              const alder = e.target.value;
 
-        {/* Info */}
-        {/* <div className="info-text">
-          <div><b>Key:</b> {selectedKey || "—"}</div>
-          <div><b>Value:</b> {selectedLabel || "—"}</div>
-        </div> */}
+              setSelectedAlder(alder);
+              setSelectedLabel(ssbDataAlder[alder]);
+              setLoading(true);
 
-        {/* Loading */}
+              fetchPopulationDataAlder(alder).finally(() => {
+                setLoading(false);
+              });
+            }}
+            className={`control-select ${loading ? "disabled" : ""}`}
+          >
+            <option value="">Velg alder</option>
+              {Object.entries(ssbDataAlder)
+                .sort(([, labelA], [, labelB]) => {
+                  const numA = parseInt(labelA, 10);
+                  const numB = parseInt(labelB, 10);
+                  return numA - numB;
+                })
+                .map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+          </select>
+        )}
+
+
         {loading && (
           <div className="loading-box">
             <span className="spinner" />
