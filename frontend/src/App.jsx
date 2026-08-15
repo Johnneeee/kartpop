@@ -5,11 +5,16 @@ import "./App.css";
 import { API_URL } from "./api.js";
 
 function App() {
-  const [kartpopData, setKartpopData] = useState([]);
-  const [ssbData, setSsbData] = useState(null);
+  const [kommuneCoordinates, setKommuneCoordinates] = useState([]);
+  const [totalPopulation, setTotalPopulation] = useState([]);
+  const [countries, setCountries] = useState(null);
+
   const [selectedKey, setSelectedKey] = useState("");
-  const [selectedLabel, setSelectedLabel] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("");
+
+  const [prosentandel, setProsentandel] = useState([]);
   const [population, setPopulation] = useState([]);
+
   const [loading, setLoading] = useState(false);
 
   const mapRef = useRef(null);
@@ -18,11 +23,13 @@ function App() {
 
   const mergedData = useMemo(
     () =>
-      kartpopData.map((item, index) => ({
+      kommuneCoordinates.map((item, index) => ({
         ...item,
         population: population[index] ?? 0,
+        prosentandel: prosentandel[index] ?? 0,
+        totalPopulation: totalPopulation[index] ?? 0,
       })),
-    [kartpopData, population]
+    [kommuneCoordinates, population, prosentandel, totalPopulation]
   );
 
   const getRadius = (value) => {
@@ -59,8 +66,8 @@ function App() {
 
       marker.bindTooltip(
         `
-          <h3>${city.kommune}</h3>
-          ${selectedLabel}: ${city.population}
+          <h3>${city.kommune} - ${city.totalPopulation}🧍</h3>
+          ${selectedCountry}: ${city.population}🧍, ${city.prosentandel}%
         `,
         {
           direction: "top",
@@ -70,63 +77,76 @@ function App() {
 
       markersRef.current.push(marker);
     });
-  }, [mergedData, selectedLabel, clearMarkers]);
+  }, [mergedData, selectedCountry, clearMarkers]);
 
-  const fetchKommuneData = async () => {
+  const fetchKommuneCoordinates = async () => {
     const res = await fetch(`${API_URL}/kartpop`);
-    setKartpopData(await res.json());
+    const data = await res.json();
+
+    setKommuneCoordinates(data);
+
+    return data;
   };
 
-  const fetchSsbMetadata = async () => {
+  const fetchTotalPopulation = async (kommuneData) => {
+    const ssbIds = kommuneData.map((item) => item.ssbid).join(",");
+    const res = await fetch(`https://data.ssb.no/api/pxwebapi/v2/tables/01222/data?lang=no&valuecodes[Contentscode]=Folketallet11&valuecodes[Tid]=2026K1&valuecodes[Region]=${ssbIds}`);
+    const json = await res.json();
+    const values = json?.value;
+    setTotalPopulation(values);
+  };
+
+  const fetchCountries = async () => {
     const res = await fetch(
       "https://data.ssb.no/api/pxwebapi/v2/tables/09817/metadata?lang=no"
     );
-
     const json = await res.json();
-
     const labels = json?.dimension?.Landbakgrunn?.category?.label;
-
     const filtered = Object.fromEntries(
       Object.entries(labels).slice(0, -5)
     );
-    // console.log(filtered)
-    // console.log({1010: "Norge",...filtered});
-    setSsbData({
+    setCountries({
       1010: "Norge",
       ...filtered,
     });
-    // setSsbData(filtered);
   };
 
   const fetchPopulationData = async (landbakgrunn) => {
-    if (!kartpopData.length) return;
+    if (!kommuneCoordinates.length) return;
 
-    const ssbIds = kartpopData.map((item) => item.ssbid).join(",");
+    const ssbIds = kommuneCoordinates.map((item) => item.ssbid).join(",");
 
     try {
-      let result = [];
+      let population = [];
+      let prosentandel = [];
 
-      if (landbakgrunn == 1010) { // in country is norway: do some calculations
+      if (landbakgrunn == 1010) { // if country is norway: do some calculations
         const res = await fetch(
           `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1,AndelBefolkning&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=999`
         );
         const data = await res.json();
         const values = data.value;
+        const pop = values.filter((_, i) => i % 2 === 0);
+        const pro = values.filter((_, i) => i % 2 === 1)
 
-        for (let i = 0; i < values.length; i += 2) {
-          const num = values[i];
-          const frac = values[i + 1];
-          result.push(frac ? Math.trunc((num / frac * 100) - num) : null);
+        for (let i = 0; i < pop.length; i += 1) {
+          population.push(Math.trunc(totalPopulation[i] - pop[i]));
+          prosentandel.push((100 - pro[i]).toFixed(2));
         }
+        
       } else {
         const response = await fetch(
-          `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`
+          `https://data.ssb.no/api/pxwebapi/v2/tables/09817/data?lang=no&valuecodes[Contentscode]=Personer1,AndelBefolkning&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Landbakgrunn]=${landbakgrunn}`
         );
         const data = await response.json();
-        result = data?.value ?? [];
+        const result = data?.value ?? [];
+        population = result.filter((_, i) => i % 2 === 0);
+        prosentandel = result.filter((_, i) => i % 2 === 1);
       }
 
-      setPopulation(result);
+      setPopulation(population);
+      // setTotalPopulation(totalPopulation);
+      setProsentandel(prosentandel);
     } catch (err) {
       console.error("Failed to fetch population data:", err);
     }
@@ -134,21 +154,16 @@ function App() {
     setLoading(false);
   };
 
-  // useEffect(() => {
-  //   setLoading(true);
-  //   fetchKommuneData();
-  //   fetchSsbMetadata();
-  //   setLoading(false);
-  // }, []);
-
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
 
       try {
+        const kommuneData = await fetchKommuneCoordinates();
         await Promise.all([
-          fetchKommuneData(),
-          fetchSsbMetadata(),
+          // fetchKommuneCoordinates(),
+          fetchCountries(),
+          fetchTotalPopulation(kommuneData),
         ]);
       } finally {
         setLoading(false);
@@ -185,11 +200,11 @@ function App() {
       <div className="control-panel">
         {/* Header */}
         <div className="control-header">
-          Etnisiter i Norge
+          Etnisiter i Norge (SSB tabell 09817) 2026
         </div>
 
         {/* Select */}
-        {ssbData && (
+        {countries && (
           <select
             value={selectedKey}
             disabled={loading}
@@ -197,7 +212,7 @@ function App() {
               const key = e.target.value;
 
               setSelectedKey(key);
-              setSelectedLabel(ssbData[key]);
+              setSelectedCountry(countries[key]);
               setLoading(true);
 
               fetchPopulationData(key).finally(() => {
@@ -207,7 +222,7 @@ function App() {
             className={`control-select ${loading ? "disabled" : ""}`}
           >
             <option value="">Velg et land</option>
-            {Object.entries(ssbData)
+            {Object.entries(countries)
               .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "no", { sensitivity: "base" }))
               .map(([key, label]) => (
               <option key={key} value={key}>
@@ -216,12 +231,6 @@ function App() {
             ))}
           </select>
         )}
-
-        {/* Info */}
-        {/* <div className="info-text">
-          <div><b>Key:</b> {selectedKey || "—"}</div>
-          <div><b>Value:</b> {selectedLabel || "—"}</div>
-        </div> */}
 
         {/* Loading */}
         {loading && (
