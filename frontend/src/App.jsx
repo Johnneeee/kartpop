@@ -66,8 +66,9 @@ function App() {
 
       marker.bindTooltip(
         `
-          <h3>${city.kommune} - ${city.totalPopulation}🧍</h3>
-          ${selectedCountry}: ${city.population}🧍, ${city.prosentandel}%
+          <h3>${city.kommune}</h3>
+          Alle: ${city.totalPopulation}<br>
+          ${selectedCountry}: ${city.population}, ${city.prosentandel}%
         `,
         {
           direction: "top",
@@ -82,9 +83,7 @@ function App() {
   const fetchKommuneCoordinates = async () => {
     const res = await fetch(`${API_URL}/kartpop`);
     const data = await res.json();
-
     setKommuneCoordinates(data);
-
     return data;
   };
 
@@ -115,7 +114,6 @@ function App() {
     if (!kommuneCoordinates.length) return;
 
     const ssbIds = kommuneCoordinates.map((item) => item.ssbid).join(",");
-
     try {
       let population = [];
       let prosentandel = [];
@@ -130,7 +128,7 @@ function App() {
         const pro = values.filter((_, i) => i % 2 === 1)
 
         for (let i = 0; i < pop.length; i += 1) {
-          population.push(Math.trunc(totalPopulation[i] - pop[i]));
+          population.push(totalPopulation[i] - pop[i]);
           prosentandel.push((100 - pro[i]).toFixed(2));
         }
         
@@ -145,7 +143,6 @@ function App() {
       }
 
       setPopulation(population);
-      // setTotalPopulation(totalPopulation);
       setProsentandel(prosentandel);
     } catch (err) {
       console.error("Failed to fetch population data:", err);
@@ -161,7 +158,6 @@ function App() {
       try {
         const kommuneData = await fetchKommuneCoordinates();
         await Promise.all([
-          // fetchKommuneCoordinates(),
           fetchCountries(),
           fetchTotalPopulation(kommuneData),
         ]);
