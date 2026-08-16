@@ -65,10 +65,15 @@ function App() {
       }).addTo(mapInstanceRef.current);
 
       marker.bindTooltip(
+        // `
+        //   <h3>${city.kommune}</h3>
+        //   Alle: ${city.totalPopulation}<br>
+        //   ${selectedCountry}: ${city.population}, ${city.prosentandel}%
+        // `,
         `
           <h3>${city.kommune}</h3>
           Alle: ${city.totalPopulation}<br>
-          ${selectedCountry}: ${city.population}, ${city.prosentandel}%
+          ${selectedCountry}: ${city.population}
         `,
         {
           direction: "top",
