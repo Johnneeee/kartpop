@@ -12,6 +12,11 @@ function App() {
   const [selectedKey, setSelectedKey] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
 
+  const [ssbDataAlder, setSsbDataAlder] = useState(null);
+  const [selectedAlder, setSelectedAlder] = useState("");
+  const [selectedLabelAlder, setSelectedLabelAlder] = useState("");
+
+
   const [prosentandel, setProsentandel] = useState([]);
   const [population, setPopulation] = useState([]);
 
@@ -115,6 +120,19 @@ function App() {
     });
   };
 
+  const fetchSsbMetadataAlder = async () => {
+    const res = await fetch(
+      "https://data.ssb.no/api/pxwebapi/v2/tables/07459/metadata?lang=no"
+    );
+    const json = await res.json();
+    const labels = json?.dimension?.Alder?.category?.label;
+    const filtered = Object.fromEntries(
+      Object.entries(labels).slice(0, -5)
+    );
+    console.log(filtered)
+    setSsbDataAlder(filtered);
+  };
+
   const fetchPopulationData = async (landbakgrunn) => {
     if (!kommuneCoordinates.length) return;
 
@@ -156,6 +174,28 @@ function App() {
     setLoading(false);
   };
 
+  const fetchPopulationDataAlder = async (alder) => {
+    if (!kommuneCoordinates.length) return;
+
+    const ssbIds = kommuneCoordinates.map((item) => item.ssbid).join(",");
+
+    try {
+      let result = [];
+      const response = await fetch(
+        `https://data.ssb.no/api/pxwebapi/v2/tables/07459/data?lang=no&valuecodes[Contentscode]=Personer1&valuecodes[Region]=${ssbIds}&valuecodes[Tid]=2026&valuecodes[Alder]=${alder}`
+      );
+      const data = await response.json();
+      result = data?.value ?? [];
+      console.log(result)
+
+      setPopulation(result);
+    } catch (err) {
+      console.error("Failed to fetch population data:", err);
+    }
+
+    setLoading(false);
+  };
+  
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -165,6 +205,7 @@ function App() {
         await Promise.all([
           fetchCountries(),
           fetchTotalPopulation(kommuneData),
+          fetchSsbMetadataAlder(),
         ]);
       } finally {
         setLoading(false);
@@ -197,53 +238,107 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Control Panel */}
-      <div className="control-panel">
-        {/* Header */}
-        <div className="control-header">
-          Etnisiter i Norge (SSB tabell 09817) 2026
+
+      <div className="controls-container">
+
+        {/* Control Panel 1 + Loader */}
+        <div className="controls-row">
+
+          <div className="control-panel">
+            <div className="control-header">
+              Etnisiter i Norge (SSB tabell 09817) 2026
+            </div>
+
+            {countries && (
+              <select
+                value={selectedKey}
+                disabled={loading}
+                onChange={(e) => {
+                  const key = e.target.value;
+
+                  setSelectedKey(key);
+                  setSelectedCountry(countries[key]);
+                  setLoading(true);
+                  setSelectedAlder("");
+
+                  fetchPopulationData(key).finally(() => {
+                    setLoading(false);
+                  });
+                }}
+                className={`control-select ${loading ? "disabled" : ""}`}
+              >
+                <option value="" hidden>Velg et land</option>
+
+                {Object.entries(countries)
+                  .sort(([, labelA], [, labelB]) =>
+                    labelA.localeCompare(labelB, "no", {
+                      sensitivity: "base",
+                    })
+                  )
+                  .map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+
+          {loading && (
+            <div className="loading-box">
+              <span className="spinner" />
+                Laster inn data...
+            </div>
+          )}
+
         </div>
 
-        {/* Select */}
-        {countries && (
-          <select
-            value={selectedKey}
-            disabled={loading}
-            onChange={(e) => {
-              const key = e.target.value;
-
-              setSelectedKey(key);
-              setSelectedCountry(countries[key]);
-              setLoading(true);
-
-              fetchPopulationData(key).finally(() => {
-                setLoading(false);
-              });
-            }}
-            className={`control-select ${loading ? "disabled" : ""}`}
-          >
-            <option value="">Velg et land</option>
-            {Object.entries(countries)
-              .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "no", { sensitivity: "base" }))
-              .map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <div className="loading-box">
-            <span className="spinner" />
-            Laster inn data...
+        {/* Control Panel 2 */}
+        <div className="control-panel">
+          <div className="control-header">
+            Alder i Norge (SSB tabell 07459) 2026
           </div>
-        )}
+
+          {ssbDataAlder && (
+            <select
+              value={selectedAlder}
+              disabled={loading}
+              onChange={(e) => {
+                const alder = e.target.value;
+
+                setSelectedAlder(alder);
+                setSelectedCountry(ssbDataAlder[alder]);
+                setLoading(true);
+                setSelectedKey("");
+
+                fetchPopulationDataAlder(alder).finally(() => {
+                  setLoading(false);
+                });
+              }}
+              className={`control-select ${loading ? "disabled" : ""}`}
+            >
+              <option value="" hidden>Velg alder</option>
+
+              {Object.entries(ssbDataAlder)
+                .sort(([, labelA], [, labelB]) => {
+                  const numA = parseInt(labelA, 10);
+                  const numB = parseInt(labelB, 10);
+                  return numA - numB;
+                })
+                .map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+
       </div>
 
       {/* Map */}
       <div ref={mapRef} className="map-container" />
+
     </div>
   );
 }
